@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="家電の消費電力と使う時間から、1か月の電気代の目安を計算できます。">
+<title>家電の電気代計算</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #E8EDF1;
+  --paper: #F9FBFC;
+  --ink: #1B2630;
+  --muted: #586772;
+  --line: #C6D1D9;
+  --steel: #3F6A8A;
+  --meter: #CF3A2E;
+  --wheel-bg: #1B2630;
+  --wheel-fg: #F2F5F7;
+  --bezel: #AEBBC5;
+  --focus: #1F5FBF;
+  --font: "Zen Kaku Gothic New", "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Yu Gothic", Meiryo, sans-serif;
+  color-scheme: light;
+  box-sizing: border-box;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #131A20;
+    --paper: #1B242C;
+    --ink: #E7EDF1;
+    --muted: #95A3AE;
+    --line: #2E3A45;
+    --steel: #7DB0D6;
+    --meter: #E0554A;
+    --wheel-bg: #0B0F13;
+    --wheel-fg: #EEF2F5;
+    --bezel: #3A4854;
+    --focus: #8DBBE0;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #131A20;
+  --paper: #1B242C;
+  --ink: #E7EDF1;
+  --muted: #95A3AE;
+  --line: #2E3A45;
+  --steel: #7DB0D6;
+  --meter: #E0554A;
+  --wheel-bg: #0B0F13;
+  --wheel-fg: #EEF2F5;
+  --bezel: #3A4854;
+  --focus: #8DBBE0;
+  color-scheme: dark;
+}
+html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+*, *::before, *::after { box-sizing: inherit; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-text-size-adjust: 100%;
+}
+main { max-width: 640px; margin: 0 auto; padding: 28px 16px 48px; }
+h1 { font-size: 1.5rem; line-height: 1.3; margin: 0 0 6px; font-weight: 700; }
+h2 { font-size: 1.05rem; margin: 32px 0 10px; font-weight: 700; }
+.lead { margin: 0 0 28px; color: var(--muted); font-size: .95rem; }
+
+/* メーター */
+.meter-label { margin: 0 0 8px; font-size: .9rem; color: var(--muted); }
+.meter-row { display: flex; align-items: flex-end; gap: 10px; }
+.wheels {
+  display: flex;
+  gap: 2px;
+  padding: 4px;
+  background: var(--bezel);
+  border-radius: 8px;
+  font-size: clamp(2rem, 11vw, 3rem);
+}
+.wheel {
+  overflow: hidden;
+  height: 1.25em;
+  width: .78em;
+  background: var(--wheel-bg);
+  color: var(--wheel-fg);
+  border-radius: 2px;
+}
+.wheel:last-child { background: var(--meter); color: #fff; }
+.wheel-col {
+  display: flex;
+  flex-direction: column;
+  transition: transform .8s cubic-bezier(.2, .8, .2, 1);
+}
+.wheel-col span {
+  display: block;
+  height: 1.25em;
+  line-height: 1.25em;
+  text-align: center;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.yen { font-size: 1.25rem; font-weight: 700; margin-bottom: .35rem; }
+.stats { display: flex; flex-wrap: wrap; gap: 8px 28px; margin: 16px 0 0; }
+.stats div { min-width: 0; }
+.stats dt { font-size: .8rem; color: var(--muted); }
+.stats dd { margin: 0; font-weight: 700; font-size: 1.05rem; }
+
+/* 入力部品 */
+.f {
+  display: flex;
+  align-items: center;
+  height: 44px;
+  padding: 0 10px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.f:focus-within { outline: 2px solid var(--focus); outline-offset: 1px; }
+.f input {
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 16px;
+}
+.u { margin-left: 4px; color: var(--muted); font-size: .8rem; white-space: nowrap; }
+.note { margin: 8px 0 0; color: var(--muted); font-size: .85rem; }
+
+.price-block { margin-top: 32px; }
+.price-block label { display: block; font-weight: 700; margin-bottom: 8px; }
+.price-block .f { max-width: 220px; background: var(--paper); }
+
+/* 家電リスト */
+.panel {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+.row { padding: 14px 14px 16px; }
+.row + .row { border-top: 1px solid var(--line); }
+.row-head { display: flex; align-items: center; gap: 8px; }
+.name {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 700;
+}
+.name:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 4px; }
+button { font: inherit; cursor: pointer; }
+button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.del {
+  min-height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  font-size: .85rem;
+}
+.fields { display: grid; grid-template-columns: 1.2fr 1fr .9fr; gap: 8px; margin-top: 8px; }
+.fields label { display: flex; flex-direction: column; gap: 4px; min-width: 0; font-size: .8rem; color: var(--muted); }
+.result { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-top: 14px; }
+.cost { font-weight: 700; font-size: 1.1rem; }
+.kwh { color: var(--muted); font-size: .85rem; }
+.bar { height: 4px; margin-top: 8px; background: var(--line); border-radius: 2px; overflow: hidden; }
+.fill { height: 100%; width: 0; background: var(--steel); transition: width .4s ease; }
+.hint { margin: 8px 0 0; color: var(--meter); font-size: .8rem; }
+.empty { margin: 0; padding: 18px 14px; color: var(--muted); font-size: .9rem; background: var(--paper); border: 1px solid var(--line); border-radius: 12px; }
+
+/* 追加ボタン */
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip {
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--ink);
+  font-size: .9rem;
+}
+.chip.own { background: var(--ink); border-color: var(--ink); color: var(--bg); }
+
+.foot { margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--line); color: var(--muted); font-size: .82rem; }
+.foot p { margin: 0 0 10px; }
+.reset {
+  min-height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  font-size: .85rem;
+}
+@media (prefers-reduced-motion: reduce) {
+  .wheel-col, .fill { transition: none; }
+}
+</style>
+</head>
+<body>
+<main>
+  <h1>家電の電気代を計算</h1>
+  <p class="lead">消費電力と使う時間を入れると、1か月の電気代の目安がわかります。</p>
+
+  <section aria-label="計算結果">
+    <p class="meter-label">1か月の電気代(目安)</p>
+    <div class="meter-row" id="meter" role="img" aria-label="1か月の電気代 0円">
+      <div class="wheels" aria-hidden="true" id="wheels"></div>
+      <span class="yen" aria-hidden="true">円</span>
+    </div>
+    <dl class="stats">
+      <div><dt>年間の目安(月×12)</dt><dd id="yearly">約 0円</dd></div>
+      <div><dt>1か月の使用量</dt><dd id="kwhTotal">0 kWh</dd></div>
+    </dl>
+  </section>
+
+  <section class="price-block">
+    <label for="price">電気料金の単価</label>
+    <div class="f">
+      <input id="price" type="number" inputmode="decimal" min="0" step="0.1">
+      <span class="u">円/kWh</span>
+    </div>
+    <p class="note">初期値の31円は、全国家庭電気製品公正取引協議会が示す目安単価(税込)です。契約中のプランの単価は、検針票や電力会社のサイトで確認できます。</p>
+  </section>
+
+  <h2>家電</h2>
+  <div class="panel" id="list"></div>
+  <p class="empty" id="empty" hidden>家電がまだありません。下のボタンから追加してください。</p>
+
+  <h2>家電を追加</h2>
+  <div class="chips" id="chips"></div>
+  <p class="note">追加した家電の数値は目安です。取扱説明書やカタログの消費電力に合わせて書き換えてください。</p>
+
+  <div class="foot">
+    <p>計算式:消費電力(W)÷ 1000 × 1日の使用時間 × 日数 × 単価。基本料金、燃料費調整額、再エネ賦課金は含みません。</p>
+    <p>実際の消費電力は機種や使い方で変わるため、表示される金額は請求額を保証するものではありません。</p>
+    <button type="button" class="reset" id="reset">初期状態に戻す</button>
+  </div>
+</main>
+
+<template id="row-tpl">
+  <div class="row">
+    <div class="row-head">
+      <input class="name" type="text" maxlength="30" placeholder="家電の名前" aria-label="家電の名前">
+      <button type="button" class="del">削除</button>
+    </div>
+    <div class="fields">
+      <label>消費電力
+        <span class="f"><input class="w" type="number" inputmode="decimal" min="0" step="any"><span class="u">W</span></span>
+      </label>
+      <label>1日の使用
+        <span class="f"><input class="h" type="number" inputmode="decimal" min="0" max="24" step="any"><span class="u">時間</span></span>
+      </label>
+      <label>1か月の日数
+        <span class="f"><input class="d" type="number" inputmode="numeric" min="0" max="31" step="1"><span class="u">日</span></span>
+      </label>
+    </div>
+    <div class="result">
+      <span class="cost"></span>
+      <span class="kwh"></span>
+    </div>
+    <div class="bar"><div class="fill"></div></div>
+    <p class="hint" hidden>時間は24まで、日数は31までで計算しています。</p>
+  </div>
+</template>
+
+<script>
+(function () {
+  'use strict';
+
+  var KEY = 'denki-calc-v1';
+  var DEFAULT_PRICE = 31;
+  var PRESETS = [
+    { name: 'エアコン(冷房)', w: 500, h: 8, d: 30 },
+    { name: 'エアコン(暖房)', w: 700, h: 8, d: 30 },
+    { name: '冷蔵庫', w: 35, h: 24, d: 30 },
+    { name: 'テレビ', w: 60, h: 4, d: 30 },
+    { name: 'LED照明', w: 30, h: 6, d: 30 },
+    { name: '電子レンジ', w: 1000, h: 0.3, d: 30 },
+    { name: '電気ケトル', w: 1200, h: 0.2, d: 30 },
+    { name: 'ドライヤー', w: 1200, h: 0.2, d: 30 },
+    { name: 'ノートPC', w: 40, h: 5, d: 30 }
+  ];
+  var DIGITS = 6;
+
+  var state = { price: DEFAULT_PRICE, rows: [] };
+  var list = document.getElementById('list');
+  var emptyEl = document.getElementById('empty');
+  var priceInput = document.getElementById('price');
+  var wheelsEl = document.getElementById('wheels');
+  var meterEl = document.getElementById('meter');
+  var yearlyEl = document.getElementById('yearly');
+  var kwhTotalEl = document.getElementById('kwhTotal');
+  var chipsEl = document.getElementById('chips');
+  var resetBtn = document.getElementById('reset');
+  var tpl = document.getElementById('row-tpl');
+  var wheelCols = [];
+  var meterReady = false;
+  var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function num(v) {
+    var n = parseFloat(v);
+    return isFinite(n) && n > 0 ? n : 0;
+  }
+  function fmt(n) { return n.toLocaleString('ja-JP'); }
+  function fmtKwh(n) { return (Math.round(n * 10) / 10).toLocaleString('ja-JP', { maximumFractionDigits: 1 }); }
+  function copyRow(p) { return { name: p.name, w: p.w, h: p.h, d: p.d }; }
+  function defaultRows() {
+    return [0, 2, 3, 4].map(function (i) { return copyRow(PRESETS[i]); });
+  }
+
+  function load() {
+    try {
+      var raw = localStorage.getItem(KEY);
+      if (!raw) return false;
+      var s = JSON.parse(raw);
+      if (!s || !Array.isArray(s.rows)) return false;
+      state.price = num(s.price) > 0 ? num(s.price) : DEFAULT_PRICE;
+      state.rows = s.rows.slice(0, 50).map(function (r) {
+        return {
+          name: String(r && r.name || '').slice(0, 30),
+          w: num(r && r.w),
+          h: num(r && r.h),
+          d: num(r && r.d)
+        };
+      });
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+  function save() {
+    try {
+      localStorage.setItem(KEY, JSON.stringify({ price: state.price, rows: state.rows }));
+    } catch (e) { /* 保存できない環境では何もしない */ }
+  }
+
+  function buildWheels() {
+    for (var i = 0; i < DIGITS; i++) {
+      var wheel = document.createElement('div');
+      wheel.className = 'wheel';
+      var col = document.createElement('div');
+      col.className = 'wheel-col';
+      for (var d = 0; d < 10; d++) {
+        var s = document.createElement('span');
+        s.textContent = d;
+        col.appendChild(s);
+      }
+      wheel.appendChild(col);
+      wheelsEl.appendChild(wheel);
+      wheelCols.push(col);
+    }
+  }
+
+  function setMeter(total) {
+    var n = Math.min(Math.pow(10, DIGITS) - 1, Math.max(0, Math.round(total)));
+    var str = String(n);
+    while (str.length < DIGITS) str = '0' + str;
+    for (var i = 0; i < DIGITS; i++) {
+      wheelCols[i].style.transform = 'translateY(' + (-Number(str.charAt(i)) * 1.25) + 'em)';
+    }
+  }
+
+  function compute() {
+    var price = num(state.price);
+    var total = 0, kwhSum = 0, res = [];
+    state.rows.forEach(function (r) {
+      var h = Math.min(24, r.h), d = Math.min(31, r.d);
+      var kwh = r.w / 1000 * h * d;
+      var yen = kwh * price;
+      res.push({ kwh: kwh, yen: yen, over: r.h > 24 || r.d > 31 });
+      total += yen;
+      kwhSum += kwh;
+    });
+    var els = list.children;
+    res.forEach(function (x, i) {
+      var el = els[i];
+      if (!el) return;
+      el.querySelector('.cost').textContent = '月 ' + fmt(Math.round(x.yen)) + '円';
+      el.querySelector('.kwh').textContent = fmtKwh(x.kwh) + ' kWh';
+      el.querySelector('.fill').style.width = (total > 0 ? Math.min(100, x.yen / total * 100) : 0) + '%';
+      el.querySelector('.hint').hidden = !x.over;
+    });
+    yearlyEl.textContent = '約 ' + fmt(Math.round(total * 12)) + '円';
+    kwhTotalEl.textContent = fmtKwh(kwhSum) + ' kWh';
+    meterEl.setAttribute('aria-label', '1か月の電気代 ' + fmt(Math.round(total)) + '円');
+    compute.last = total;
+    if (meterReady) setMeter(total);
+  }
+  compute.last = 0;
+
+  function render() {
+    list.textContent = '';
+    state.rows.forEach(function (r) {
+      var el = tpl.content.firstElementChild.cloneNode(true);
+      el.querySelector('.name').value = r.name;
+      el.querySelector('.w').value = r.w;
+      el.querySelector('.h').value = r.h;
+      el.querySelector('.d').value = r.d;
+      el.querySelector('.del').setAttribute('aria-label', (r.name || '家電') + 'を削除');
+      list.appendChild(el);
+    });
+    list.hidden = state.rows.length === 0;
+    emptyEl.hidden = state.rows.length > 0;
+  }
+
+  function addRow(row) {
+    state.rows.push(row);
+    render();
+    compute();
+    save();
+    var last = list.lastElementChild;
+    if (last && last.scrollIntoView) {
+      last.scrollIntoView({ block: 'nearest', behavior: reduceMotion ? 'auto' : 'smooth' });
+    }
+  }
+
+  function rowIndex(target) {
+    var rowEl = target.closest('.row');
+    return rowEl ? Array.prototype.indexOf.call(list.children, rowEl) : -1;
+  }
+
+  list.addEventListener('input', function (e) {
+    var i = rowIndex(e.target);
+    if (i < 0) return;
+    var r = state.rows[i];
+    var c = e.target.classList;
+    if (c.contains('name')) {
+      r.name = e.target.value;
+      list.children[i].querySelector('.del').setAttribute('aria-label', (r.name || '家電') + 'を削除');
+    } else if (c.contains('w')) { r.w = num(e.target.value); }
+    else if (c.contains('h')) { r.h = num(e.target.value); }
+    else if (c.contains('d')) { r.d = num(e.target.value); }
+    compute();
+    save();
+  });
+
+  list.addEventListener('click', function (e) {
+    var btn = e.target.closest('.del');
+    if (!btn) return;
+    var i = rowIndex(btn);
+    if (i < 0) return;
+    state.rows.splice(i, 1);
+    render();
+    compute();
+    save();
+  });
+
+  priceInput.addEventListener('input', function () {
+    state.price = num(priceInput.value);
+    compute();
+    save();
+  });
+
+  // 追加ボタン
+  PRESETS.forEach(function (p) {
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'chip';
+    b.textContent = p.name;
+    b.addEventListener('click', function () { addRow(copyRow(p)); });
+    chipsEl.appendChild(b);
+  });
+  var own = document.createElement('button');
+  own.type = 'button';
+  own.className = 'chip own';
+  own.textContent = '自分で入力して追加';
+  own.addEventListener('click', function () { addRow({ name: '', w: 100, h: 1, d: 30 }); });
+  chipsEl.appendChild(own);
+
+  // 初期状態に戻す(2回押しで確定)
+  var resetTimer = null;
+  resetBtn.addEventListener('click', function () {
+    if (!resetTimer) {
+      resetBtn.textContent = 'もう一度押すと初期状態に戻ります';
+      resetTimer = setTimeout(function () {
+        resetBtn.textContent = '初期状態に戻す';
+        resetTimer = null;
+      }, 4000);
+      return;
+    }
+    clearTimeout(resetTimer);
+    resetTimer = null;
+    resetBtn.textContent = '初期状態に戻す';
+    state.price = DEFAULT_PRICE;
+    state.rows = defaultRows();
+    priceInput.value = DEFAULT_PRICE;
+    render();
+    compute();
+    save();
+  });
+
+  // 起動
+  buildWheels();
+  if (!load()) state.rows = defaultRows();
+  priceInput.value = state.price;
+  render();
+  compute();
+  // 読み込み直後に一度だけ、メーターを0から回して表示する
+  setTimeout(function () {
+    meterReady = true;
+    setMeter(compute.last);
+  }, 150);
+})();
+</script>
+</body>
+</html>
