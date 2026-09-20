@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="点滴の滴下数(滴/分)・流量(mL/h)・所要時間と、体重あたりの投与量を計算する学習用ツールです。">
+<title>点滴計算ツール</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #F1F3F6;
+  --paper: #FFFFFF;
+  --ink: #1E2430;
+  --muted: #566074;
+  --line: #D5DAE3;
+  --accent: #3B3F9E;
+  --on-accent: #FFFFFF;
+  --amber: #E9B93A;
+  --amber-ink: #A56F00;
+  --focus: #2F5FD0;
+  --font: "BIZ UDPGothic", "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Yu Gothic", Meiryo, sans-serif;
+  color-scheme: light;
+  box-sizing: border-box;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #12151C;
+    --paper: #1A1F29;
+    --ink: #E8EBF2;
+    --muted: #9AA3B5;
+    --line: #2C3340;
+    --accent: #9AA0FF;
+    --on-accent: #10131A;
+    --amber: #E9B93A;
+    --amber-ink: #F0C55A;
+    --focus: #A5AAFF;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #12151C;
+  --paper: #1A1F29;
+  --ink: #E8EBF2;
+  --muted: #9AA3B5;
+  --line: #2C3340;
+  --accent: #9AA0FF;
+  --on-accent: #10131A;
+  --amber: #E9B93A;
+  --amber-ink: #F0C55A;
+  --focus: #A5AAFF;
+  color-scheme: dark;
+}
+html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+*, *::before, *::after { box-sizing: inherit; }
+[hidden] { display: none !important; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-text-size-adjust: 100%;
+}
+main { max-width: 640px; margin: 0 auto; padding: 28px 16px 48px; }
+h1 { margin: 0 0 6px; font-size: 1.5rem; line-height: 1.3; }
+.lead { margin: 0 0 16px; color: var(--muted); font-size: .95rem; }
+.caution {
+  margin: 0 0 24px;
+  padding: 8px 12px;
+  border-left: 3px solid var(--amber);
+  background: var(--paper);
+  font-size: .85rem;
+  color: var(--muted);
+}
+button { font: inherit; cursor: pointer; }
+button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+/* タブ */
+.tabs { display: flex; border-bottom: 1px solid var(--line); }
+.tab {
+  flex: 1;
+  min-height: 48px;
+  padding: 0 4px;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  font-size: .92rem;
+  font-weight: 700;
+}
+.tab[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
+.panel {
+  margin-top: 12px;
+  padding: 18px 16px 20px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+/* 入力 */
+.field { margin-top: 16px; }
+.field:first-child { margin-top: 0; }
+.field > label, .flabel { display: block; margin-bottom: 6px; font-size: .85rem; color: var(--muted); }
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.f {
+  display: flex;
+  align-items: center;
+  height: 44px;
+  padding: 0 10px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.f:focus-within { outline: 2px solid var(--focus); outline-offset: 1px; }
+.f input, .f select {
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 16px;
+}
+.f input { width: 100%; }
+.f select { font-size: .9rem; padding-left: 6px; }
+.f select option { color: #1E2430; }
+.u { margin-left: 4px; color: var(--muted); font-size: .8rem; white-space: nowrap; }
+.seg-group { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.seg { position: relative; }
+.seg input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.seg span {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 48px;
+  padding: 4px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg);
+  font-size: .92rem;
+  line-height: 1.3;
+}
+.seg small { color: var(--muted); font-size: .72rem; }
+.seg input:checked + span { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.seg input:checked + span small { color: inherit; opacity: .85; }
+.seg input:focus-visible + span { outline: 2px solid var(--focus); outline-offset: 2px; }
+.seg-group .f { width: 140px; }
+.hint { margin: 6px 0 0; font-size: .78rem; color: var(--muted); }
+
+/* 結果 */
+.result {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 22px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+}
+.drip { flex: none; width: 72px; }
+.drip svg { display: block; width: 72px; height: auto; }
+.main { min-width: 0; }
+.lbl { font-size: .85rem; color: var(--muted); }
+.big { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 3px; font-weight: 700; line-height: 1.2; }
+.big .n { font-size: clamp(2rem, 9.5vw, 2.75rem); font-variant-numeric: tabular-nums; }
+.big .bu { margin-right: 6px; font-size: 1rem; }
+.sub { margin-top: 2px; font-size: .95rem; color: var(--muted); }
+.kv { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px 8px; margin: 18px 0 0; }
+.kv dt { font-size: .78rem; color: var(--muted); }
+.kv dd { margin: 0; font-size: .98rem; font-weight: 700; }
+.clamp { margin: 12px 0 0; font-size: .78rem; color: var(--muted); }
+.msg { margin: 20px 0 0; color: var(--muted); font-size: .9rem; }
+
+/* 点滴筒のアニメーション */
+.drip { --interval: 1s; }
+.s-solid { fill: var(--ink); }
+.s-outline { fill: none; stroke: var(--ink); stroke-width: 2; }
+.s-fluid { fill: var(--amber); }
+.s-tick { stroke: var(--muted); stroke-width: 1.5; stroke-linecap: round; }
+.ripple { fill: none; stroke: var(--amber-ink); stroke-width: 1.5; opacity: 0; transform-box: fill-box; transform-origin: 50% 50%; animation: ripple var(--interval) infinite linear; }
+.drop { fill: var(--amber); stroke: var(--amber-ink); stroke-width: 1; transform-box: fill-box; transform-origin: 50% 0%; animation: drop var(--interval) infinite linear; }
+@keyframes drop {
+  0% { transform: translateY(0) scale(.15); opacity: 1; animation-timing-function: ease-out; }
+  62% { transform: translateY(0) scale(1); opacity: 1; animation-timing-function: cubic-bezier(.5, 0, 1, .6); }
+  84% { transform: translateY(66px) scale(1); opacity: 1; }
+  85%, 100% { transform: translateY(66px) scale(1); opacity: 0; }
+}
+@keyframes ripple {
+  0%, 83% { opacity: 0; transform: scaleX(.2); }
+  84% { opacity: .9; transform: scaleX(.3); }
+  100% { opacity: 0; transform: scaleX(1.3); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .drop, .ripple { animation: none; }
+  .ripple { opacity: 0; }
+}
+
+.foot { margin-top: 36px; padding-top: 20px; border-top: 1px solid var(--line); color: var(--muted); font-size: .82rem; }
+.foot p { margin: 0 0 10px; }
+.foot ul { margin: 0 0 10px; padding-left: 1.2em; }
+</style>
+</head>
+<body>
+<main>
+  <h1>点滴計算ツール</h1>
+  <p class="lead">滴下数・流量・所要時間と、体重あたりの投与量を計算します。</p>
+  <p class="caution">学習・確認用の計算ツールです。実際の投与は、医師の指示と施設の手順に従い、必ず複数人で確認してください。</p>
+
+  <div class="tabs" role="tablist" aria-label="計算の種類">
+    <button type="button" class="tab" role="tab" id="t-a" aria-controls="p-a" aria-selected="true">滴下数・流量</button>
+    <button type="button" class="tab" role="tab" id="t-b" aria-controls="p-b" aria-selected="false" tabindex="-1">所要時間</button>
+    <button type="button" class="tab" role="tab" id="t-c" aria-controls="p-c" aria-selected="false" tabindex="-1">体重あたり</button>
+  </div>
+
+  <!-- A: 滴下数・流量 -->
+  <section id="p-a" class="panel" role="tabpanel" aria-labelledby="t-a">
+    <div class="field">
+      <label for="a-vol">輸液量</label>
+      <div class="f"><input id="a-vol" type="number" inputmode="decimal" min="0" step="any" value="500"><span class="u">mL</span></div>
+    </div>
+    <div class="field">
+      <div class="flabel">投与時間</div>
+      <div class="row2">
+        <div class="f"><input id="a-h" type="number" inputmode="numeric" min="0" step="1" value="3" aria-label="投与時間の時間"><span class="u">時間</span></div>
+        <div class="f"><input id="a-m" type="number" inputmode="numeric" min="0" step="1" value="0" aria-label="投与時間の分"><span class="u">分</span></div>
+      </div>
+    </div>
+    <div class="field">
+      <div class="flabel" id="fa-label">滴下係数</div>
+      <div class="seg-group" role="radiogroup" aria-labelledby="fa-label">
+        <label class="seg"><input type="radio" name="fa" value="20" checked><span>20滴/mL<small>一般用</small></span></label>
+        <label class="seg"><input type="radio" name="fa" value="60"><span>60滴/mL<small>小児・微量用</small></span></label>
+        <label class="seg"><input type="radio" name="fa" value="other"><span>その他<small>自分で入力</small></span></label>
+        <span class="f"><input id="fa-other" type="number" inputmode="decimal" min="0" step="any" aria-label="滴下係数(その他)"><span class="u">滴/mL</span></span>
+      </div>
+      <p class="hint">使用する輸液セットの表示で確認してください。</p>
+    </div>
+
+    <p class="msg" id="a-empty" hidden>輸液量と投与時間を入力してください。</p>
+    <div id="a-out">
+      <div class="result">
+        <div class="drip" id="a-drip" aria-hidden="true"></div>
+        <div class="main">
+          <div class="lbl">滴下数</div>
+          <div class="big"><span class="n" id="a-rate">0</span><span class="bu">滴/分</span></div>
+          <div class="sub" id="a-iv"></div>
+        </div>
+      </div>
+      <p class="clamp" id="a-clamp" hidden>アニメーションは0.3〜6秒の範囲で表示しています。実際の速さとは異なります。
